@@ -130,11 +130,13 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="dg.cpp" />
+    <ClCompile Include="dg_io.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="rendering_nodes.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="dg.h" />
+    <ClInclude Include="dg_io.h" />
     <ClInclude Include="rendering_nodes.h" />
   </ItemGroup>
   <ItemGroup>

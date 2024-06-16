@@ -1,8 +1,13 @@
 #include "rendering_nodes.h"
+#include "dg_io.h"
 
 #include "../tt_cpplib/windont.h"
 #include "../tt_cpplib/tt_window.h"
+#include "../tt_cpplib/tt_messages.h"
+#include "../tt_cpplib/tt_strings.h"
 #include "../tt_rendering/gl/tt_glcontext.h"
+
+#include <unordered_set>
 
 struct RenderGraph {
     std::vector<Node*> nodes;
@@ -55,6 +60,7 @@ RenderGraph generateTestGraph() {
     blit.blendMode.setValue(TTRendering::MaterialBlendMode::Opaque);
 
     auto& forward = graph.instantiate<MaterialSetImageNode>("forward");
+    forward.uniformName.setValue("uImage");
     forward.material.setInput(blit.result);
     forward.image.setInput(cbo.result);
 
@@ -138,8 +144,7 @@ int main() {
 }
 #endif
 
-// TODO: Just because I can't hash or compare handles I have to resort to this bullshit
-// HandleBase should implement an identifier based hash
+// TODO: Make handles hashable and use unordered_set
 template<typename T> class HandleSet {
     std::vector<size_t> identifiers;
     std::vector<T> contents;
@@ -169,7 +174,7 @@ public:
 
 class App : public TT::Window {
     TTRendering::OpenGLContext context;
-    TTRendering::MeshHandle quadMesh;
+    TTRendering::MeshHandle quadMesh = TTRendering::MeshHandle::Null;
     bool sizeKnown = false;
     RenderGraph graph;
     std::vector<const TTRendering::RenderPass*> orderedRenderPasses;
@@ -186,10 +191,12 @@ public:
     }
 
     void initRenderingResources() {   
-#if 0
+#if 1
         // Obtain a graph that describes the rendering pipeline
         graph = generateTestGraph();
-     
+#endif
+
+#if 0
         {
             GraphSerializer serializer;
             TTJson::Object obj = serializer.serialize(graph.nodes);
@@ -198,7 +205,7 @@ public:
         }
 #endif
 
-#if 1
+#if 0
         {
             // Get an empty vassal
             // graph.destroy();
@@ -226,9 +233,9 @@ public:
             deserializer.socketFactory["ImageTiling"] = [&](const std::string& label, bool isOutput, Node& node) -> ISocket* { return new ImageTilingSocket(label, TTRendering::ImageTiling::Clamp, isOutput, node); };
             deserializer.socketFactory["MaterialBlendMode"] = [&](const std::string& label, bool isOutput, Node& node) -> ISocket* { return new MaterialBlendModeSocket(label, TTRendering::MaterialBlendMode::Opaque, isOutput, node); };
 
-            deserializer.socketFactory["ImageHandle"] = [&](const std::string& label, bool isOutput, Node& node) -> ISocket* { return new ImageHandleSocket(label, RenderGraphGlobals::NULL_IMAGE_HANDLE, isOutput, node); };
-            deserializer.socketFactory["FramebufferHandle"] = [&](const std::string& label, bool isOutput, Node& node) -> ISocket* { return new FramebufferHandleSocket(label, RenderGraphGlobals::NULL_FRAMEBUFFER_HANDLE, isOutput, node); };
-            deserializer.socketFactory["MaterialHandle"] = [&](const std::string& label, bool isOutput, Node& node) -> ISocket* { return new MaterialHandleSocket(label, RenderGraphGlobals::NULL_MATERIAL_HANDLE, isOutput, node); };
+            deserializer.socketFactory["ImageHandle"] = [&](const std::string& label, bool isOutput, Node& node) -> ISocket* { return new ImageHandleSocket(label, TTRendering::ImageHandle::Null, isOutput, node); };
+            deserializer.socketFactory["FramebufferHandle"] = [&](const std::string& label, bool isOutput, Node& node) -> ISocket* { return new FramebufferHandleSocket(label, TTRendering::FramebufferHandle::Null, isOutput, node); };
+            deserializer.socketFactory["MaterialHandle"] = [&](const std::string& label, bool isOutput, Node& node) -> ISocket* { return new MaterialHandleSocket(label, TTRendering::MaterialHandle::Null, isOutput, node); };
             deserializer.socketFactory["RenderPass"] = [&](const std::string& label, bool isOutput, Node& node) -> ISocket* { return new RenderPassSocket(label, nullptr, isOutput, node); };
                 
             // Load the file
@@ -236,9 +243,17 @@ public:
             TTJson::Parser parser;
             TTJson::Value obj;
             parser.parse(in, obj);
-            
-            // Deserialize into the graph
-            deserializer.deserializeGraph(obj);
+            if(parser.hasError()){
+                TT::warning(parser.error());
+            } else {
+                // Deserialize into the graph
+                deserializer.deserializeGraph(obj);
+
+                if(deserializer.deserializeErrors.size() > 0) {
+                    auto errors = TT::join(deserializer.deserializeErrors, "\n");
+                    TT::warning(errors);
+                }
+            }
         }
 #endif
 
@@ -275,7 +290,7 @@ public:
         // and thus after which passes they have to go.
         for(const TTRendering::RenderPass* renderPass : renderPasses) {
             // This pass needs these images
-            std::set<TTRendering::MaterialHandle> mtls;
+            std::unordered_set<TTRendering::MaterialHandle> mtls;
             HandleSet<TTRendering::ImageHandle> imgs;
             for(const auto& q : renderPass->drawQueue().queues)
                 for(const auto& q2 : q.queues)

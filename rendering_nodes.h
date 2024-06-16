@@ -5,20 +5,13 @@
 #include "../tt_rendering/tt_rendering.h"
 #include "../tt_cpplib/tt_cgmath.h"
 
-// TODO: This is clearly not good. The parent application must set this before computing anything in the graph.
 namespace RenderGraphGlobals {
+    // TODO: This is clearly not good. The parent application must set this before computing anything in the graph.
     extern TTRendering::RenderingContext* gContext;
     extern TTRendering::MeshHandle* gQuadMesh;
-
-    // TODO: Move these into tt_rendering so we can make these constructors private again.
-    // TODO: We use those for comparisons, and we can safely compare just the identifier, we should implement that in an == operator in tt_rendering instead.
-    extern TTRendering::ImageHandle NULL_IMAGE_HANDLE;
-    extern TTRendering::FramebufferHandle NULL_FRAMEBUFFER_HANDLE;
-    extern TTRendering::ShaderHandle NULL_SHADER_HANDLE;
-    extern TTRendering::MaterialHandle NULL_MATERIAL_HANDLE;
 }
 
-// Hahah kut C++ waarom is typeid(T).name() niet gewoon dit en waarom kan ik niet gewoon een string in een template stoppen. Generate dit zelf ofzo.
+// TODO: Is this really the only way to provide a string as template argument? Should the template become a massive macro instead...?
 namespace {
     char F32[] = "F32";
     char U16[] = "U16";
@@ -46,14 +39,14 @@ protected:
     bool deserializeValue(const TTJson::Value& value) override {
         if (value.isDouble()) {
             if constexpr (std::is_same_v<T, float> || std::is_same_v<T, double>)
-                // WTF MSVC?
-                Socket<T, NumericSocket<T, NAME>, NAME>::setValue((T)value.asDouble());
+                // TODO: Send help: 
+                // function was not declared in the template definition context and can be 
+                // found only via argument-dependent lookup in the instantiation context
+                NumericSocket::setValue((T)value.asDouble());
             else
-                // WTF MSVC?
-                Socket<T, NumericSocket<T, NAME>, NAME>::setValue((T)(long long)value.asDouble());
+                NumericSocket::setValue((T)(long long)value.asDouble());
         } else if(value.isInt())
-            // WTF MSVC?
-            Socket<T, NumericSocket<T, NAME>, NAME>::setValue((T)value.asInt());
+            NumericSocket::setValue((T)value.asInt());
         else 
             return false;
         return true;
@@ -139,7 +132,6 @@ class CreateImageNode final : public Node {
 public:
     std::string typeName() const override { return "CreateImageNode"; }
 
-    // TODO: Can we delete the copy and move constructors to avoid accidentally declaring these by value"?
     U16Socket& width;
     U16Socket& height;
     ImageFormatSocket& format;
