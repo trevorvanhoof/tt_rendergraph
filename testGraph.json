@@ -1,0 +1,336 @@
+{
+  "nodes": [
+    {
+      "outputs": [
+        {
+          "label": "result",
+          "type": "ImageHandle",
+          "value": null
+        }
+      ],
+      "label": "cbo",
+      "type": "CreateImageNode",
+      "inputs": [
+        {
+          "label": "width",
+          "type": "U16",
+          "value": 0
+        },
+        {
+          "type": "U16",
+          "label": "height",
+          "value": 0
+        },
+        {
+          "label": "format",
+          "type": "ImageFormat",
+          "value": 1
+        },
+        {
+          "type": "ImageInterpolation",
+          "label": "interpolation",
+          "value": 0
+        },
+        {
+          "label": "tiling",
+          "type": "ImageTiling",
+          "value": 1
+        },
+        {
+          "label": "factor",
+          "type": "U16",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "type": "CreateFramebufferNode",
+      "label": "fbo",
+      "outputs": [
+        {
+          "type": "FramebufferHandle",
+          "label": "result",
+          "value": null
+        }
+      ],
+      "inputs": [
+        {
+          "label": "colorBuffers",
+          "type": "<array>",
+          "value": [
+            null
+          ]
+        },
+        {
+          "type": "ImageHandle",
+          "label": "depthBuffer",
+          "value": null
+        }
+      ]
+    },
+    {
+      "outputs": [
+        {
+          "label": "result",
+          "type": "RenderPass",
+          "value": null
+        }
+      ],
+      "label": "intermediate",
+      "type": "CreateRenderPassNode",
+      "inputs": [
+        {
+          "type": "Vec4",
+          "label": "clearColor",
+          "value": [
+            0.0,
+            0.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "label": "framebuffer",
+          "type": "FramebufferHandle",
+          "value": null
+        }
+      ]
+    },
+    {
+      "type": "CreateMaterialNode",
+      "label": "generate",
+      "outputs": [
+        {
+          "type": "MaterialHandle",
+          "label": "result",
+          "value": null
+        }
+      ],
+      "inputs": [
+        {
+          "label": "shaderPaths",
+          "type": "<array>",
+          "value": [
+            "noop.vert.glsl",
+            "generate.frag.glsl"
+          ]
+        },
+        {
+          "type": "MaterialBlendMode",
+          "label": "blendMode",
+          "value": 4
+        }
+      ]
+    },
+    {
+      "outputs": [],
+      "label": "generatePass",
+      "type": "DrawQuadNode",
+      "inputs": [
+        {
+          "type": "MaterialHandle",
+          "label": "material",
+          "value": null
+        },
+        {
+          "label": "renderPass",
+          "type": "RenderPass",
+          "value": null
+        }
+      ]
+    },
+    {
+      "outputs": [
+        {
+          "label": "result",
+          "type": "RenderPass",
+          "value": null
+        }
+      ],
+      "label": "present",
+      "type": "CreateRenderPassNode",
+      "inputs": [
+        {
+          "type": "Vec4",
+          "label": "clearColor",
+          "value": [
+            0.0,
+            0.5,
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "label": "framebuffer",
+          "type": "FramebufferHandle",
+          "value": null
+        }
+      ]
+    },
+    {
+      "type": "CreateMaterialNode",
+      "label": "blit",
+      "outputs": [
+        {
+          "type": "MaterialHandle",
+          "label": "result",
+          "value": null
+        }
+      ],
+      "inputs": [
+        {
+          "label": "shaderPaths",
+          "type": "<array>",
+          "value": [
+            "noop.vert.glsl",
+            "blit.frag.glsl"
+          ]
+        },
+        {
+          "type": "MaterialBlendMode",
+          "label": "blendMode",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "type": "MaterialSetImageNode",
+      "label": "forward",
+      "outputs": [],
+      "inputs": [
+        {
+          "type": "MaterialHandle",
+          "label": "material",
+          "value": null
+        },
+        {
+          "label": "image",
+          "type": "ImageHandle",
+          "value": null
+        },
+        {
+          "type": "String",
+          "label": "uniformName",
+          "value": ""
+        }
+      ]
+    },
+    {
+      "type": "DrawQuadNode",
+      "label": "presentPass",
+      "outputs": [],
+      "inputs": [
+        {
+          "label": "material",
+          "type": "MaterialHandle",
+          "value": null
+        },
+        {
+          "type": "RenderPass",
+          "label": "renderPass",
+          "value": null
+        }
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "source": {
+        "nodeId": 0,
+        "socketLabel": "result",
+        "socketArrayIndices": []
+      },
+      "destination": {
+        "nodeId": 1,
+        "socketLabel": "colorBuffers",
+        "socketArrayIndices": [
+          0
+        ]
+      }
+    },
+    {
+      "source": {
+        "nodeId": 1,
+        "socketLabel": "result",
+        "socketArrayIndices": []
+      },
+      "destination": {
+        "nodeId": 2,
+        "socketLabel": "framebuffer",
+        "socketArrayIndices": []
+      }
+    },
+    {
+      "source": {
+        "nodeId": 3,
+        "socketLabel": "result",
+        "socketArrayIndices": []
+      },
+      "destination": {
+        "nodeId": 4,
+        "socketLabel": "material",
+        "socketArrayIndices": []
+      }
+    },
+    {
+      "source": {
+        "nodeId": 2,
+        "socketLabel": "result",
+        "socketArrayIndices": []
+      },
+      "destination": {
+        "nodeId": 4,
+        "socketLabel": "renderPass",
+        "socketArrayIndices": []
+      }
+    },
+    {
+      "source": {
+        "nodeId": 6,
+        "socketLabel": "result",
+        "socketArrayIndices": []
+      },
+      "destination": {
+        "nodeId": 7,
+        "socketLabel": "material",
+        "socketArrayIndices": []
+      }
+    },
+    {
+      "source": {
+        "nodeId": 0,
+        "socketLabel": "result",
+        "socketArrayIndices": []
+      },
+      "destination": {
+        "nodeId": 7,
+        "socketLabel": "image",
+        "socketArrayIndices": []
+      }
+    },
+    {
+      "source": {
+        "nodeId": 6,
+        "socketLabel": "result",
+        "socketArrayIndices": []
+      },
+      "destination": {
+        "nodeId": 8,
+        "socketLabel": "material",
+        "socketArrayIndices": []
+      }
+    },
+    {
+      "source": {
+        "nodeId": 5,
+        "socketLabel": "result",
+        "socketArrayIndices": []
+      },
+      "destination": {
+        "nodeId": 8,
+        "socketLabel": "renderPass",
+        "socketArrayIndices": []
+      }
+    }
+  ]
+}

@@ -142,6 +142,9 @@
       <Project>{15b477d9-36cf-453e-b079-56fa6c4c7533}</Project>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="testGraph.json" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

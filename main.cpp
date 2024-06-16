@@ -6,8 +6,18 @@
 
 struct RenderGraph {
     std::vector<Node*> nodes;
+    // We can probably just compute all nodes instead of tracking only specific node types or nodes without outputs.
     std::vector<Node*> sinkNodes;
     std::vector<CreateRenderPassNode*> renderPassNodes;
+
+    template<typename T> T& instantiate(const std::string& label) {
+        nodes.push_back(new T(label));
+        if constexpr (std::is_same_v<T, MaterialSetImageNode> || std::is_same_v<T, DrawQuadNode>)
+            sinkNodes.push_back((T*)nodes.back());
+        if constexpr (std::is_same_v<T, CreateRenderPassNode>)
+            renderPassNodes.push_back((T*)nodes.back());
+        return *(T*)nodes.back();
+    }
 
     void destroy() { for (Node* node : nodes) delete node; }
 };
@@ -15,48 +25,43 @@ struct RenderGraph {
 RenderGraph generateTestGraph() {
     RenderGraph graph;
 
-    auto& cbo = *new CreateImageNode("cbo");
+    auto& cbo = graph.instantiate<CreateImageNode>("cbo");
     cbo.width.setValue(0);
     cbo.height.setValue(0);
     cbo.factor.setValue(1);
 
-    auto& fbo = *new CreateFramebufferNode("fbo");
+    auto& fbo = graph.instantiate<CreateFramebufferNode>("fbo");
     fbo.colorBuffers.appendNew().setInput(cbo.result);
 
-    auto& intermediate = *new CreateRenderPassNode("intermediate");
+    auto& intermediate = graph.instantiate<CreateRenderPassNode>("intermediate");
     intermediate.clearColor.setValue(TT::Vec4(0.0f, 0.0f, 1.0f, 1.0f));
     intermediate.framebuffer.setInput(fbo.result);
 
-    auto& generate = *new CreateMaterialNode("generate");
+    auto& generate = graph.instantiate<CreateMaterialNode>("generate");
     generate.shaderPaths.appendNew().setValue("noop.vert.glsl");
     generate.shaderPaths.appendNew().setValue("generate.frag.glsl");
     generate.blendMode.setValue(TTRendering::MaterialBlendMode::Additive);
 
-    auto& generatePass = *new DrawQuadNode("generatePass");
+    auto& generatePass = graph.instantiate<DrawQuadNode>("generatePass");
     generatePass.material.setInput(generate.result);
     generatePass.renderPass.setInput(intermediate.result);
 
-    auto& present = *new CreateRenderPassNode("present");
+    auto& present = graph.instantiate<CreateRenderPassNode>("present");
     present.clearColor.setValue(TT::Vec4(0.0f, 0.5f, 0.0f, 1.0f));
 
-    auto& blit = *new CreateMaterialNode("blit");
+    auto& blit = graph.instantiate<CreateMaterialNode>("blit");
     blit.shaderPaths.appendNew().setValue("noop.vert.glsl");
     blit.shaderPaths.appendNew().setValue("blit.frag.glsl");
     blit.blendMode.setValue(TTRendering::MaterialBlendMode::Opaque);
 
-    auto& forward = *new MaterialSetImageNode("forward");
+    auto& forward = graph.instantiate<MaterialSetImageNode>("forward");
     forward.material.setInput(blit.result);
     forward.image.setInput(cbo.result);
 
-    auto& presentPass = *new DrawQuadNode("presentPass");
+    auto& presentPass = graph.instantiate<DrawQuadNode>("presentPass");
     presentPass.material.setInput(blit.result);
     presentPass.renderPass.setInput(present.result);
 
-    // We can probably just compute all nodes instead of tracking only specific node types or nodes without outputs.
-    graph.nodes = { &cbo, &fbo, &intermediate, &generate, &generatePass, &present, &blit, &forward, &presentPass };
-    graph.sinkNodes = { &generatePass, &forward, &presentPass };
-    graph.renderPassNodes = { &intermediate, &present };
-    
     return graph;
 }
 
@@ -131,82 +136,11 @@ int main() {
 
     return (int)f.result.value();
 }
-
-
-/*
-class _State:
-    def __init__(self, w: int, h: int) -> None:
-        self.ctx = OpenGLContext()
-        self.ctx.windowResized(w, h)
-
-        quadVerts = (ctypes.c_float * 8)(0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0)
-        quadVbo = self.ctx.createBuffer(ctypes.sizeof(quadVerts), quadVerts)
-        quadMesh = self.ctx.createMesh(4, quadVbo, (MeshAttribute(MeshAttribute.Dimensions.D2, MeshAttribute.ElementType.F32, 0),), None, PrimitiveType.TriangleFan)
-
-        # Obtain a graph that describes the rendering pipeline
-        graph = list(generateTestGraph())
-
-        # For testing we can shuffle the graph to verify that
-        # our render pass ordering always comes out valid.
-        # random.shuffle(graph)
-
-        # Make sure the rendering nodes are ready to evaluate graphs
-        initializeRenderGraphState(RenderGraphState(self.ctx, quadMesh))
-
-        # Then make sure all endpoints are evaluated to generate the actual GPU pipeline
-        renderPasses: list[RenderPass] = []
-        for node in graph:
-            if isinstance(node, (MaterialSetImageNode, DrawQuadNode)):
-                node.compute()
-            if isinstance(node, CreateRenderPassNode):
-                renderPasses.append(node.result.value())
-
-        # Find which passes are responsible for generating which images
-        imageGenerators = {}
-        for renderPass in renderPasses:
-            fbo = renderPass.framebuffer()
-            if not fbo:
-                continue
-
-            for cbo in fbo.iterColorAttachments():
-                imageGenerators.setdefault(cbo, set()).add(renderPass)
-            dbo = fbo.depthStencilAttachment()
-            if dbo:
-                imageGenerators.setdefault(dbo, set()).add(renderPass)
-
-        # In turn, sort the passes based on which images they use,
-        # and thus after which passes they have to go.
-        self.renderPasses = []
-        for renderPass in renderPasses:
-            # this pass needs these images
-            mtls = set()
-            imgs = set()
-            for q in renderPass.drawQueue().queues:
-                for q2 in q.queues:
-                    mtls |= set(q2.keys)
-            for mtl in mtls:
-                imgs |= set(mtl.images().values())
-
-            # and thus it comes after the passes that generate these images
-            insertAt = 0
-            for img in imgs:
-                if img in imageGenerators:
-                    previous = imageGenerators[img]
-                    if previous in self.renderPasses:
-                        insertAt = max(insertAt, self.renderPasses.index(previous) + 1)
-            self.renderPasses.insert(insertAt, renderPass)
-
-    def draw(self, defaultFramebuffer: int = 0) -> None:
-        for renderPass in self.renderPasses:
-            self.ctx.drawPass(renderPass, defaultFramebuffer)
-*/
-
 #endif
 
 // TODO: Just because I can't hash or compare handles I have to resort to this bullshit
 // HandleBase should implement an identifier based hash
-template<typename T>
-class HandleSet {
+template<typename T> class HandleSet {
     std::vector<size_t> identifiers;
     std::vector<T> contents;
 
@@ -251,9 +185,62 @@ public:
         graph.destroy();
     }
 
-    void initRenderingResources() {
+    void initRenderingResources() {   
+#if 0
         // Obtain a graph that describes the rendering pipeline
         graph = generateTestGraph();
+     
+        {
+            GraphSerializer serializer;
+            TTJson::Object obj = serializer.serialize(graph.nodes);
+            std::ofstream out("testGraph.json");
+            TTJson::serialize(obj, out);
+        }
+#endif
+
+#if 1
+        {
+            // Get an empty vassal
+            // graph.destroy();
+            // graph.nodes.clear();
+            // graph.sinkNodes.clear();
+            // graph.renderPassNodes.clear();
+
+            // Set up the deserializer factory
+            GraphSerializer deserializer;
+            deserializer.nodeFactory["CreateImageNode"] = [&](const std::string& label) -> Node& { return graph.instantiate<CreateImageNode>(label); };
+            deserializer.nodeFactory["CreateFramebufferNode"] = [&](const std::string& label) -> Node& { return graph.instantiate<CreateFramebufferNode>(label); };
+            deserializer.nodeFactory["CreateRenderPassNode"] = [&](const std::string& label) -> Node& { return graph.instantiate<CreateRenderPassNode>(label); };
+            deserializer.nodeFactory["DrawQuadNode"] = [&](const std::string& label) -> Node& { return graph.instantiate<DrawQuadNode>(label); };
+            deserializer.nodeFactory["CreateMaterialNode"] = [&](const std::string& label) -> Node& { return graph.instantiate<CreateMaterialNode>(label); };
+            deserializer.nodeFactory["MaterialSetImageNode"] = [&](const std::string& label) -> Node& { return graph.instantiate<MaterialSetImageNode>(label); };
+            
+            // TODO: Duplicating the default values here is a real problem. Maybe we should remove that being an argument and solve it some other way.
+            deserializer.socketFactory["Vec4"] = [&](const std::string& label, bool isOutput, Node& node) -> ISocket* { return new Vec4Socket(label, TT::Vec4(0.0f, 0.0f, 0.0f, 0.0f), isOutput, node); };
+            deserializer.socketFactory["String"] = [&](const std::string& label, bool isOutput, Node& node) -> ISocket* { return new StringSocket(label, "", isOutput, node); };
+            
+            deserializer.socketFactory["F32"] = [&](const std::string& label, bool isOutput, Node& node) -> ISocket* { return new F32Socket(label, 0.0f, isOutput, node); };
+            deserializer.socketFactory["U16"] = [&](const std::string& label, bool isOutput, Node& node) -> ISocket* { return new U16Socket(label, 0, isOutput, node); };
+            deserializer.socketFactory["ImageFormat"] = [&](const std::string& label, bool isOutput, Node& node) -> ISocket* { return new ImageFormatSocket(label, TTRendering::ImageFormat::RGBA32F, isOutput, node); };
+            deserializer.socketFactory["ImageInterpolation"] = [&](const std::string& label, bool isOutput, Node& node) -> ISocket* { return new ImageInterpolationSocket(label, TTRendering::ImageInterpolation::Linear, isOutput, node); };
+            deserializer.socketFactory["ImageTiling"] = [&](const std::string& label, bool isOutput, Node& node) -> ISocket* { return new ImageTilingSocket(label, TTRendering::ImageTiling::Clamp, isOutput, node); };
+            deserializer.socketFactory["MaterialBlendMode"] = [&](const std::string& label, bool isOutput, Node& node) -> ISocket* { return new MaterialBlendModeSocket(label, TTRendering::MaterialBlendMode::Opaque, isOutput, node); };
+
+            deserializer.socketFactory["ImageHandle"] = [&](const std::string& label, bool isOutput, Node& node) -> ISocket* { return new ImageHandleSocket(label, RenderGraphGlobals::NULL_IMAGE_HANDLE, isOutput, node); };
+            deserializer.socketFactory["FramebufferHandle"] = [&](const std::string& label, bool isOutput, Node& node) -> ISocket* { return new FramebufferHandleSocket(label, RenderGraphGlobals::NULL_FRAMEBUFFER_HANDLE, isOutput, node); };
+            deserializer.socketFactory["MaterialHandle"] = [&](const std::string& label, bool isOutput, Node& node) -> ISocket* { return new MaterialHandleSocket(label, RenderGraphGlobals::NULL_MATERIAL_HANDLE, isOutput, node); };
+            deserializer.socketFactory["RenderPass"] = [&](const std::string& label, bool isOutput, Node& node) -> ISocket* { return new RenderPassSocket(label, nullptr, isOutput, node); };
+                
+            // Load the file
+            std::ifstream in("testGraph.json");
+            TTJson::Parser parser;
+            TTJson::Value obj;
+            parser.parse(in, obj);
+            
+            // Deserialize into the graph
+            deserializer.deserializeGraph(obj);
+        }
+#endif
 
         // Make sure the rendering nodes are ready to evaluate graphs
         RenderGraphGlobals::gContext = &context;

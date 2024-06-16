@@ -14,13 +14,13 @@ namespace RenderGraphGlobals {
 
 CreateImageNode::CreateImageNode(const std::string& label)
     : Node(label)
-    , width(addInput<unsigned short>("width", 128))
-    , height(addInput<unsigned short>("height", 128))
-    , format(addInput("format", TTRendering::ImageFormat::RGBA32F))
-    , interpolation(addInput("interpolation", TTRendering::ImageInterpolation::Linear))
-    , tiling(addInput("tiling", TTRendering::ImageTiling::Clamp))
-    , factor(addInput<unsigned short>("factor", 0))
-    , result(addOutput("result", TTRendering::ImageHandle(0, TTRendering::ImageFormat::RGBA32F, TTRendering::ImageInterpolation::Linear, TTRendering::ImageTiling::Clamp))) {
+    , width(addInput<U16Socket>("width", 128))
+    , height(addInput<U16Socket>("height", 128))
+    , format(addInput<ImageFormatSocket>("format", TTRendering::ImageFormat::RGBA32F))
+    , interpolation(addInput<ImageInterpolationSocket>("interpolation", TTRendering::ImageInterpolation::Linear))
+    , tiling(addInput<ImageTilingSocket>("tiling", TTRendering::ImageTiling::Clamp))
+    , factor(addInput<U16Socket>("factor", 0))
+    , result(addOutput<ImageHandleSocket>("result", TTRendering::ImageHandle(0, TTRendering::ImageFormat::RGBA32F, TTRendering::ImageInterpolation::Linear, TTRendering::ImageTiling::Clamp))) {
     _initializing = false;
 }
 
@@ -36,9 +36,9 @@ void CreateImageNode::_compute() {
 
 CreateFramebufferNode::CreateFramebufferNode(const std::string& label)
     : Node(label)
-    , colorBuffers(addArrayInput("colorBuffers", RenderGraphGlobals::NULL_IMAGE_HANDLE))
-    , depthBuffer(addInput("depthBuffer", RenderGraphGlobals::NULL_IMAGE_HANDLE))
-    , result(addOutput("result", RenderGraphGlobals::NULL_FRAMEBUFFER_HANDLE)) {
+    , colorBuffers(addArrayInput<ImageHandleSocket>("colorBuffers", RenderGraphGlobals::NULL_IMAGE_HANDLE))
+    , depthBuffer(addInput<ImageHandleSocket>("depthBuffer", RenderGraphGlobals::NULL_IMAGE_HANDLE))
+    , result(addOutput<FramebufferHandleSocket>("result", RenderGraphGlobals::NULL_FRAMEBUFFER_HANDLE)) {
     _initializing = false;
 }
 
@@ -61,9 +61,9 @@ void CreateFramebufferNode::_compute() {
 
 CreateMaterialNode::CreateMaterialNode(const std::string& label)
     : Node(label)
-    , shaderPaths(addArrayInput<std::string>("shaderPaths", ""))
-    , blendMode(addInput("blendMode", TTRendering::MaterialBlendMode::Opaque))
-    , result(addOutput("result", RenderGraphGlobals::NULL_MATERIAL_HANDLE)) {
+    , shaderPaths(addArrayInput<StringSocket>("shaderPaths", ""))
+    , blendMode(addInput<MaterialBlendModeSocket>("blendMode", TTRendering::MaterialBlendMode::Opaque))
+    , result(addOutput<MaterialHandleSocket>("result", RenderGraphGlobals::NULL_MATERIAL_HANDLE)) {
     _initializing = false;
 }
 
@@ -76,14 +76,14 @@ void CreateMaterialNode::_compute() {
 
 MaterialSetImageNode::MaterialSetImageNode(const std::string& label)
     : Node(label)
-    , material(addInput("material", RenderGraphGlobals::NULL_MATERIAL_HANDLE))
-    , image(addInput("image", RenderGraphGlobals::NULL_IMAGE_HANDLE))
-    , uniformName(addInput<std::string>("uniformName", "")) {
+    , material(addInput<MaterialHandleSocket>("material", RenderGraphGlobals::NULL_MATERIAL_HANDLE))
+    , image(addInput<ImageHandleSocket>("image", RenderGraphGlobals::NULL_IMAGE_HANDLE))
+    , uniformName(addInput<StringSocket>("uniformName", "")) {
     _initializing = false;
 }
 
 void MaterialSetImageNode::_compute() {
-    auto& mtl = material.value();
+    TTRendering::MaterialHandle& mtl = material.value();
     const auto& img = image.value();
     if (img.identifier() == RenderGraphGlobals::NULL_IMAGE_HANDLE.identifier() ||
         mtl.shader().identifier() == RenderGraphGlobals::NULL_SHADER_HANDLE.identifier())
@@ -93,9 +93,9 @@ void MaterialSetImageNode::_compute() {
     
 CreateRenderPassNode::CreateRenderPassNode(const std::string& label)
     : Node(label)
-    , clearColor(addInput("clearColor", TT::Vec4(0.0f, 0.0f, 0.0f, 0.0f)))
-    , framebuffer(addInput("framebuffer", RenderGraphGlobals::NULL_FRAMEBUFFER_HANDLE))
-    , result(addOutput<TTRendering::RenderPass*>("result", nullptr)) {
+    , clearColor(addInput<Vec4Socket>("clearColor", TT::Vec4(0.0f, 0.0f, 0.0f, 0.0f)))
+    , framebuffer(addInput<FramebufferHandleSocket>("framebuffer", RenderGraphGlobals::NULL_FRAMEBUFFER_HANDLE))
+    , result(addOutput<RenderPassSocket>("result", nullptr)) {
     _initializing = false;
 }
 
@@ -112,8 +112,8 @@ void CreateRenderPassNode::_compute() {
 
 DrawQuadNode::DrawQuadNode(const std::string& label)
     : Node(label) 
-    , material(addInput("material", RenderGraphGlobals::NULL_MATERIAL_HANDLE))
-    , renderPass(addInput<TTRendering::RenderPass*>("renderPass", nullptr)) {
+    , material(addInput<MaterialHandleSocket>("material", RenderGraphGlobals::NULL_MATERIAL_HANDLE))
+    , renderPass(addInput<RenderPassSocket>("renderPass", nullptr)) {
     _initializing = false;
 }
 
