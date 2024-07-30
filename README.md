@@ -4,8 +4,8 @@ An implementation of a dependency graph with templated (so strongly typed) socke
 
 Made over a weekend as a proof of concept for a friend of mine, on top of whatever the version of my other utility libraries was at that time.
 So it relies on these, but I failed to save which commit hash and things likely won't compile or run at this point:
-https://github.com/trevorvanhoof/tt_cpplib
-https://github.com/trevorvanhoof/tt_rendering
+- https://github.com/trevorvanhoof/tt_cpplib
+- https://github.com/trevorvanhoof/tt_rendering
 
 ---
 
